@@ -3,3 +3,4 @@ pandas
 math
 plotly
 scipy
+jupyter
