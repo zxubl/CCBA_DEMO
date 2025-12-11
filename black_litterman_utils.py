@@ -173,13 +173,13 @@ def adjust_splits_in_nav(nav_df, etf_suffix='US Equity', max_daily_change=0.25):
 
 def get_proxy_data(client_name, risk_level):
     print(f'Import Data for {client_name}')
-    proxy_info = pd.read_excel(f'data/{client_name}/proxy_info.xlsx', header=0)
+    proxy_info = pd.read_excel(f'{client_name}/proxy_info.xlsx', header=0)
     ticker_to_type = dict(zip(proxy_info['BBG Ticker'], proxy_info['代表指数名称']))
-    nav_df = pd.read_csv(f'data/{client_name}/proxy_data.csv', index_col=0, parse_dates=True).ffill()
+    nav_df = pd.read_csv(f'{client_name}/proxy_data.csv', index_col=0, parse_dates=True).ffill()
     nav_df = adjust_splits_in_nav(nav_df).rename(columns=ticker_to_type)
 
     # fx conversion
-    fx_df = pd.read_csv(f'data/{client_name}/fx_data.csv', header=0, index_col=0, parse_dates=True).ffill()
+    fx_df = pd.read_csv(f'{client_name}/fx_data.csv', header=0, index_col=0, parse_dates=True).ffill()
     for idx in proxy_info.index:
         proxy_currency = proxy_info.loc[idx, 'Currency']
         proxy_ticker = proxy_info.loc[idx, '代表指数名称']
@@ -672,4 +672,5 @@ def compare_portfolios(
             print(f"{metric:<25} {a_val:>11.2%} {b_val:>11.2%} {diff:>11.2%}")
 
     return nav_a, nav_b, stats_a, stats_b
+
 
