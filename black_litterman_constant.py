@@ -96,19 +96,19 @@ risk_to_target_vol = {
 'Enhanced': 0.069
 },
 'C3': {
-'Defensive': 0.097,
-'Standard': 0.102,
-'Enhanced': 0.107
+'Defensive': 0.087,
+'Standard': 0.092,
+'Enhanced': 0.097
 },
 'C4': {
-'Defensive': 0.127,
-'Standard': 0.133,
-'Enhanced': 0.139
+'Defensive': 0.107,
+'Standard': 0.113,
+'Enhanced': 0.119
 },
 'C5': {
-'Defensive': 0.16,
-'Standard': 0.166,
-'Enhanced': 0.172
+'Defensive': 0.12,
+'Standard': 0.126,
+'Enhanced': 0.132
 }
 }
 

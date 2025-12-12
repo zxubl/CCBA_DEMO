@@ -173,13 +173,13 @@ def adjust_splits_in_nav(nav_df, etf_suffix='US Equity', max_daily_change=0.25):
 
 def get_proxy_data(client_name, risk_level):
     print(f'Import Data for {client_name}')
-    proxy_info = pd.read_excel(f'{client_name}/proxy_info.xlsx', header=0)
+    proxy_info = pd.read_excel(f'data/{client_name}/proxy_info.xlsx', header=0)
     ticker_to_type = dict(zip(proxy_info['BBG Ticker'], proxy_info['代表指数名称']))
-    nav_df = pd.read_csv(f'{client_name}/proxy_data.csv', index_col=0, parse_dates=True).ffill()
+    nav_df = pd.read_csv(f'data/{client_name}/proxy_data.csv', index_col=0, parse_dates=True).ffill()
     nav_df = adjust_splits_in_nav(nav_df).rename(columns=ticker_to_type)
 
     # fx conversion
-    fx_df = pd.read_csv(f'{client_name}/fx_data.csv', header=0, index_col=0, parse_dates=True).ffill()
+    fx_df = pd.read_csv(f'data/{client_name}/fx_data.csv', header=0, index_col=0, parse_dates=True).ffill()
     for idx in proxy_info.index:
         proxy_currency = proxy_info.loc[idx, 'Currency']
         proxy_ticker = proxy_info.loc[idx, '代表指数名称']
@@ -204,7 +204,7 @@ def get_proxy_data(client_name, risk_level):
 
     # proxy replacement
     proxy_info_change = proxy_info.dropna(subset='New Proxy')
-    for idx in proxy_info_change.index:
+    for idx in proxy_info_change.index[:-1]:
         print(f"\n Change Underlying Proxy for {proxy_info_change.loc[idx, '资产子类']}")
         print(f"Old Proxy: {proxy_info_change.loc[idx, '代表指数名称']}")
         print(f"New Proxy: {proxy_info_change.loc[idx, 'New Proxy']}")
@@ -470,9 +470,9 @@ def plot_portfolio_history(portfolio_history: dict, title: str = "Portfolio Weig
 
 
 def print_view_sensitivity_results(baseline_weights, sensitivity_results, stats_baseline):
-    print("\n" + "=" * 100)
+    print("\n" + "=" * 60)
     print("VIEW SENSITIVITY ANALYSIS (Weight + Performance Impact)")
-    print("=" * 100)
+    print("=" * 60)
 
     print("\n.BASELINE PORTFOLIO PERFORMANCE:")
     for k, v in stats_baseline.items():
@@ -487,7 +487,7 @@ def print_view_sensitivity_results(baseline_weights, sensitivity_results, stats_
         return
 
     print(f"\n.TOP {len(sensitivity_results)} VIEWS BY WEIGHT IMPACT:")
-    print("-" * 100)
+    print("-" * 60)
 
     # Use wcwidth for alignment
     try:
@@ -575,57 +575,39 @@ def compare_portfolios(
         name_b: str = "Portfolio B"
 ):
     """
-    Compare two portfolios via backtest and weight allocation.
+    Compare two portfolios:
+    1. Show weight allocation
+    2. Show backtested NAV
+    3. Print performance metrics
 
-    Returns NAVs, stats, and plots (NAV + weights).
+    Returns NAVs, stats.
     """
-    # 1. Backtest both portfolios
+    # 1. Backtest both portfolios (needed for NAV and stats)
     nav_a, stats_a = backtest_portfolio(weights_a, returns_df, window, rebalance=False)
     nav_b, stats_b = backtest_portfolio(weights_b, returns_df, window, rebalance=False)
 
-    # Align NAVs to same index
+    # Align NAVs
     all_dates = nav_a.index.union(nav_b.index)
     nav_a = nav_a.reindex(all_dates, method='pad')
     nav_b = nav_b.reindex(all_dates, method='pad')
 
-    # 2. Plot NAV comparison
-    fig_nav = go.Figure()
-    fig_nav.add_trace(go.Scatter(x=nav_a.index, y=nav_a.values, mode='lines', name=name_a))
-    fig_nav.add_trace(go.Scatter(x=nav_b.index, y=nav_b.values, mode='lines', name=name_b))
-    fig_nav.update_layout(
-        title=f"{name_a} vs {name_b} — Cumulative NAV",
-        yaxis_title="Cumulative NAV (Base = 1.0)",
-        hovermode="x unified",
-        height=500,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        )
-    )
-    fig_nav.show()
-
-    # 3. Plot weight comparison
-    # Align weights to same asset universe
+    # 2. === FIRST: Plot Weight Comparison ===
     all_assets = weights_a.index.union(weights_b.index)
     w_a = weights_a.reindex(all_assets, fill_value=0.0)
     w_b = weights_b.reindex(all_assets, fill_value=0.0)
 
-    # Optional: filter out assets with near-zero weights in both
-    min_weight = 0.005  # 0.5%
+    # Filter small weights
+    min_weight = 0.005
     significant = (w_a.abs() >= min_weight) | (w_b.abs() >= min_weight)
     w_a = w_a[significant]
     w_b = w_b[significant]
 
-    # Sort by average weight for better visualization
+    # Sort by average weight
     avg_weights = (w_a + w_b) / 2
     sort_order = avg_weights.sort_values(ascending=False).index
     w_a = w_a.reindex(sort_order)
     w_b = w_b.reindex(sort_order)
 
-    # Create grouped bar chart
     fig_weights = go.Figure()
     fig_weights.add_trace(go.Bar(
         x=w_a.index,
@@ -652,12 +634,33 @@ def compare_portfolios(
             y=1.02,
             xanchor="right",
             x=1
-        )
+        ),
+        margin=dict(t=100)
     )
     fig_weights.show()
 
-    # 4. Print performance stats
-    print(f"\n=== {name_a} vs {name_b} Performance ===")
+    # 3. === SECOND: Plot NAV Comparison ===
+    fig_nav = go.Figure()
+    fig_nav.add_trace(go.Scatter(x=nav_a.index, y=nav_a.values, mode='lines', name=name_a))
+    fig_nav.add_trace(go.Scatter(x=nav_b.index, y=nav_b.values, mode='lines', name=name_b))
+    fig_nav.update_layout(
+        title=f"{name_a} vs {name_b} — Cumulative NAV",
+        yaxis_title="Cumulative NAV (Base = 1.0)",
+        hovermode="x unified",
+        height=500,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        margin=dict(t=100)
+    )
+    fig_nav.show()
+
+    # 4. === THIRD: Print Performance Metrics ===
+    print(f"\n=== {name_a} vs {name_b} Performance Metrics ===")
     print(f"{'Metric':<25} {name_a:>12} {name_b:>12} {'Δ (A-B)':>12}")
     print("-" * 70)
     for metric in ['Annualized Return', 'Annualized Volatility', 'Sharpe Ratio', 'Max Drawdown']:
@@ -672,5 +675,4 @@ def compare_portfolios(
             print(f"{metric:<25} {a_val:>11.2%} {b_val:>11.2%} {diff:>11.2%}")
 
     return nav_a, nav_b, stats_a, stats_b
-
 

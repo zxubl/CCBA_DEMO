@@ -6,6 +6,10 @@ from scipy.optimize import minimize
 
 from black_litterman_constant import *
 
+import warnings
+
+warnings.filterwarnings("ignore")
+
 
 # Function to compute returns from NAV
 def compute_returns(nav_df):
@@ -17,7 +21,7 @@ def compute_returns(nav_df):
 
 
 # Function to compute covariance matrix from returns
-def compute_covariance(returns_df, window=None, method='sample'):
+def compute_covariance(returns_df, window=None, method='ledoit_wolf'):
     """
     Compute annualized covariance matrix.
     Assume returns are daily; multiply by 252 for annual.
@@ -260,13 +264,13 @@ def get_portfolio_weight(input_param: dict = None):
     sigma = input_param.get('covariance_matrix')
 
     constraints = {
-        'min_weight': 0.005,
-        'max_weight': 0.2,
+        'min_weight': input_param.get('min_weight', 0.005),
+        'max_weight': input_param.get('max_weight', 0.2),
     }
     if risk_level in ['C3', 'C4', 'C5']:
         equity_indices = [i for i, asset in enumerate(mu.index) if sub_class_to_broad_class.get(asset) == '权益']
-        equity_min = 0.1 + 0.1 * int(risk_level[-1])
-        equity_max = 0.3 + 0.1 * int(risk_level[-1])
+        equity_min = input_param.get('min_equity', 0.1 + 0.1 * int(risk_level[-1]))
+        equity_max = input_param.get('max_equity', 0.3 + 0.1 * int(risk_level[-1]))
         constraints['groups'] = [{'indices': equity_indices, 'min': equity_min, 'max': equity_max}]
 
     if optimization_method == 'mean_variance':
@@ -405,7 +409,16 @@ def mean_variance_optimization(
     )
 
     if not res_min_var.success:
-        raise ValueError("Min var failed: " + str(res_min_var.message))
+        all_constraints = [sum_cons] + group_cons
+        res_min_var = minimize(
+            min_var_obj, x0=np.ones(n) / n,
+            method='SLSQP',
+            bounds=bounds,
+            constraints=all_constraints,
+            options={'maxiter': 1000}
+        )
+        if not res_min_var.success:
+            raise ValueError("Min var failed: " + str(res_min_var.message))
 
     min_var = res_min_var.fun
     if min_var > target_var:
@@ -430,7 +443,17 @@ def mean_variance_optimization(
         final_vol = np.sqrt(np.dot(res.x.T, np.dot(Sigma_np, res.x)))
         return pd.Series(res.x, index=mu.index), final_vol
     else:
-        raise ValueError("Max return failed: " + str(res.message))
+        all_constraints = [sum_cons, var_cons] + group_cons
+
+        res = minimize(
+            max_ret_obj, x0=res_min_var.x,
+            method='SLSQP',
+            bounds=bounds,
+            constraints=all_constraints,
+            options={'maxiter': 1000}
+        )
+        if not res_min_var.success:
+            raise ValueError("Max return failed: " + str(res.message))
 
 
 # Risk Parity Optimization
